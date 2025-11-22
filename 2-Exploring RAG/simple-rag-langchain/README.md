@@ -1,6 +1,6 @@
-# 📚 LangChain Teaching Notebooks - Complete RAG Course
+# 📚 LangChain Notebooks - Complete RAG Course
 
-A comprehensive, hands-on course for learning **Retrieval-Augmented Generation (RAG)** with **LangChain 1.0.5+** - January 2025.
+A comprehensive, hands-on course for learning **Retrieval-Augmented Generation (RAG)** with **LangChain 1.0.5+** - November 2025.
 
 Perfect for **mixed-level classes** with beginners and intermediate students!
 
@@ -453,7 +453,7 @@ Each notebook includes exercises:
 
 ## 📝 Course Updates
 
-**Version:** 1.0.0 (January 2025)
+**Version:** 1.0.0 (November 2025)
 
 **LangChain Version:** 1.0.5+
 
@@ -469,11 +469,6 @@ Each notebook includes exercises:
 
 ---
 
-## 📄 License
-
-MIT License - Feel free to use and modify for your courses and projects!
-
----
 
 ## 🙏 Acknowledgments
 
