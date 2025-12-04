@@ -1,0 +1,345 @@
+# Exploring Langchain
+
+[Complete AI Automation And Agentic AI Bootcamp With n8n](https://www.udemy.com/course/complete-ai-automation-and-agentic-ai-bootcamp-with-n8n/?couponCode=MASTERAI)
+
+**GitHub Repo** :- https://github.com/sourangshupal/simple-rag-langchain
+
+**Code Download Link** :- https://drive.google.com/file/d/1gH9PaMtZUKb5-5nJ98s23ZkRzkJF6Zda/view?usp=sharing
+
+**ChunkViz** :- https://chunkviz.up.railway.app/
+
+**OLLAMA DOWNLOAD** :- https://ollama.com/download
+
+### Updated Requirements.txt
+
+```markdown
+# LangChain Teaching Notebooks - Requirements
+# Updated: November 2025
+# Python 3.9+ recommended
+# Compatible with LangChain 1.0.5+
+
+# ============================================================================
+# CORE LANGCHAIN PACKAGES
+# ============================================================================
+langchain
+langchain-core
+langchain-community
+langchain-text-splitters
+
+# ============================================================================
+# LLM & EMBEDDING PROVIDERS
+# ============================================================================
+# OpenAI (required)
+langchain-openai
+openai
+
+# Google Gemini (optional - for Notebook 04)
+langchain-google-genai
+google-generativeai
+
+# HuggingFace (optional - for local embeddings)
+langchain-huggingface
+sentence-transformers
+
+# Ollama (optional - for local LLMs)
+#langchain-ollama==0.2.3
+
+# ============================================================================
+# VECTOR STORES
+# ============================================================================
+# FAISS (required for Notebook 05)
+faiss-cpu
+
+# Chroma (required for Notebook 05)
+langchain-chroma
+chromadb
+
+# Qdrant (optional - for advanced users)
+# langchain-qdrant==0.2.3
+# qdrant-client==1.13.2
+
+# Pinecone (optional - cloud vector store)
+# langchain-pinecone==0.3.5
+# pinecone-client==5.0.2
+
+# ============================================================================
+# DOCUMENT LOADERS
+# ============================================================================
+# PDF Processing (required)
+pypdf
+
+# Web scraping (required for Notebook 02)
+beautifulsoup4
+lxml
+
+# Markdown (optional)
+# unstructured==0.18.0
+
+# ============================================================================
+# UTILITIES
+# ============================================================================
+# Environment Management (required)
+python-dotenv
+
+# Token counting (required for cost estimation)
+tiktoken
+
+# Jupyter Notebooks (required)
+jupyter
+notebook
+ipykernel
+
+# Numpy (required for similarity calculations)
+numpy
+
+# ============================================================================
+# DEVELOPMENT & TESTING (optional)
+# ============================================================================
+# pytest==8.3.5
+# pytest-asyncio==0.25.2
+# black==25.1.0
+# flake8==7.2.0
+
+# ============================================================================
+# INSTALLATION INSTRUCTIONS
+# ============================================================================
+#
+# Basic Installation (required packages only):
+#   pip install -r requirements.txt
+#
+# Full Installation (all optional packages):
+#   pip install -r requirements.txt
+#   pip install langchain-huggingface sentence-transformers
+#   pip install langchain-qdrant qdrant-client
+#   pip install unstructured
+#
+# For specific notebooks:
+#   Notebooks 01-03: Core packages only
+#   Notebook 04: Add langchain-google-genai
+#   Notebook 05: Add langchain-chroma chromadb
+#   Notebooks 06-07: All required packages
+#
+# Notes:
+#   - Use Python 3.9, 3.10, or 3.11 (3.12+ may have compatibility issues)
+#   - For GPU support with FAISS, use: pip install faiss-gpu
+#   - Some packages may require additional system dependencies
+#
+# ============================================================================
+
+```
+
+## LLM Selection OPENAI or GEMINI
+
+```python
+# OPENAI
+# pip install -U langchain-eopnai
+from langchain_openai import ChatOpenAI
+
+# Initialize the LLM
+
+temperature: 0 = deterministic, 1 = creative
+llm = ChatOpenAI(
+     model="gpt-3.5-turbo",  # Cheaper, faster model for learning
+     temperature=0  # Deterministic outputs for learning
+)
+# ============================= OR ==========================
+# Gemini 
+# pip install -U langchain-google-genai
+from langchain_google_genai import ChatGoogleGenerativeAI
+
+llm = ChatGoogleGenerativeAI(
+model="gemini-2.5-flash",  # Example Gemini model
+temperature=0  # Deterministic outputs for learning
+)
+
+# Make a simple call
+response = llm.invoke("What is LangChain in one sentence?")
+
+# Print the response
+print("Question: What is LangChain in one sentence?")
+print(f"\nAnswer: {response.content}")
+```
+
+[huggingface.co](https://huggingface.co/spaces/mteb/leaderboard)
+
+## Google Gemini Embeddings
+
+```python
+# Below is the code for Gemini Embeddings:
+
+from langchain_google_genai import GoogleGenerativeAIEmbeddings
+
+embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
+
+# Test the embeddings with a sample text
+sample_text = "This is a test sentence to demonstrate embeddings."
+# sample_embedding = embeddings.embed_query(sample_text)
+
+print(f"✓ Embeddings model initialized: text-embedding-3-small")
+print(f"✓ Embedding dimension: {len(sample_embedding)}")
+print(f"✓ Sample embedding (first 10 values): {sample_embedding[:10]}")
+print(f"✓ Each chunk will be converted to a {len(sample_embedding)}-dimensional vector for similarity search")
+```
+
+---
+
+## 🎯 **Maximum Marginal Relevance (MMR)**
+
+**MMR balances two competing objectives:**
+
+1. **Relevance** - How similar documents are to your query
+2. **Diversity** - How different the retrieved documents are from each other
+
+**The core idea:** Instead of just returning the top-k most similar documents (which might be very similar to each other), MMR ensures you get diverse results while maintaining relevance.
+
+### **How MMR Works:**
+
+```python
+mmr_retriever = vectorstore.as_retriever(
+    search_type="mmr",
+    search_kwargs={
+        "k": 5,              # Final number of documents to return
+        "fetch_k": 50,       # Initial pool of candidates to consider
+        "lambda_mult": 0.5   # Diversity vs relevance tradeoff (0-1)
+    }
+)
+
+# Key Parameters
+# k: Number of final documents to return
+# fetch_k: Number of documents to initially fetch (MMR selects from this pool)
+# lambda_mult: Controls the tradeoff
+# - `1.0` = Pure relevance (similar to cosine similarity)
+# - `0.0` = Maximum diversity
+# - `0.25-0.5` = Good balance (typical values)
+```
+
+---
+
+### **MMR vs Cosine Similarity**
+
+| **Aspect** | **Cosine Similarity** | **MMR** |
+| --- | --- | --- |
+| **Goal** | Find most similar documents | Find relevant and diverse documents |
+| **Results** | May return similar or redundant documents | Returns diverse perspectives |
+| **Use Case** | Specific fact-finding | Comprehensive understanding |
+| **Computation** | Faster (single pass) | Slower (iterative selection) |
+| **Redundancy** | High potential | Minimized by design |
+
+*Example Comparison:*
+
+Given the query: **"Tell me about the party that night"**
+
+**Cosine Similarity might return:**
+
+```markdown
+1. "The frogs and toads were meeting that night for a party under the moon."
+2. "There was a party under the moon, that all toads, with frogs, decided to throw that night."
+3. "And the frogs and toads said: 'Let us have a party tonight, as the moon is shining'."
+```
+
+*(All very similar—redundant information)*
+
+**MMR would return:**
+
+```markdown
+1. "The frogs and toads were meeting that night for a party under the moon."
+2. "For the party, frogs and toads set a rule: everyone was to wear a purple hat."
+```
+
+*(Similar first result, but second result adds new diverse information)*
+
+---
+
+## 📋 **All LangChain Vector Store Search Types**
+
+### **1. Similarity Search (Default)**
+
+The standard cosine similarity search - returns top-k most similar documents.
+
+```python
+retriever = vectorstore.as_retriever(
+    search_type="similarity",  # or omit this (it's default)
+    search_kwargs={"k": 5}
+)
+```
+
+**When to use:**
+
+- Finding specific facts
+- When you want the most relevant matches
+- Fast retrieval needed
+
+---
+
+### **2. MMR (Maximum Marginal Relevance)**
+
+Balances relevance with diversity.
+
+```python
+retriever = vectorstore.as_retriever(
+    search_type="mmr",
+    search_kwargs={
+        "k": 5,           # Number of documents to return
+        "fetch_k": 20,    # Pool size to select from
+        "lambda_mult": 0.5  # Diversity parameter
+    }
+)
+```
+
+**When to use:**
+
+- Dataset has many similar documents
+- Need comprehensive coverage
+- Avoiding redundant information
+- Research/exploration tasks
+
+---
+
+### **3. Similarity Score Threshold**
+
+Returns only documents above a certain similarity threshold.
+
+```python
+retriever = vectorstore.as_retriever(
+    search_type="similarity_score_threshold",
+    search_kwargs={
+        "score_threshold": 0.8,  # Only return docs with score > 0.8
+        "k": 10  # Optional: max results
+    }
+)
+```
+
+**When to use:**
+
+- Quality control over results
+- Only want highly relevant matches
+- Acceptable to return fewer results
+- Filtering out low-quality matches
+
+---
+
+### **4. Metadata Filtering**
+
+Filter by document metadata before or during search.
+
+```python
+retriever = vectorstore.as_retriever(
+    search_kwargs={
+        "k": 5,
+        "filter": {
+            "source": "twitter",
+            "date": {"$gte": "2024-01-01"}
+        }
+    }
+)
+```
+
+**When to use:**
+
+- Searching within specific document subsets
+- Time-based filtering
+- Source-specific queries
+- Combining semantic + structured search
+
+
+https://superlinked.com/vector-db-comparison
