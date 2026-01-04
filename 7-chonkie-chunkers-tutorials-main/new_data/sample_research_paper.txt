@@ -1,0 +1,165 @@
+Semantic Chunking Strategies for Retrieval-Augmented Generation Systems
+
+Abstract
+
+Retrieval-Augmented Generation (RAG) systems have emerged as a powerful paradigm for enhancing large language models with external knowledge. A critical component of RAG systems is text chunking - the process of segmenting documents into manageable units for embedding and retrieval. This paper presents a comprehensive analysis of semantic chunking strategies, comparing traditional fixed-size approaches with modern embedding-based methods. We evaluate nine distinct chunking algorithms across multiple dimensions including semantic coherence, retrieval accuracy, and computational efficiency. Our experiments demonstrate that adaptive semantic chunking outperforms fixed-size methods by 23% on average across benchmark datasets, while maintaining reasonable computational overhead. We introduce a novel hybrid approach that combines the efficiency of token-based chunking with the semantic awareness of embedding-based methods, achieving state-of-the-art results on document retrieval tasks.
+
+1. Introduction
+
+The proliferation of large language models (LLMs) has revolutionized natural language processing, enabling unprecedented capabilities in text generation, question answering, and reasoning. However, LLMs face fundamental limitations: their knowledge is frozen at training time, they cannot access private or proprietary data, and they are prone to hallucination when information is uncertain. Retrieval-Augmented Generation addresses these challenges by augmenting LLM inference with relevant information retrieved from external knowledge bases.
+
+Central to effective RAG implementation is the text chunking strategy employed during document ingestion. Chunking serves two critical purposes: first, it segments long documents into units that fit within embedding model context windows; second, it creates semantic units that can be independently retrieved and ranked. The quality of chunking directly impacts downstream retrieval accuracy and, consequently, the quality of generated responses.
+
+Traditional chunking approaches employ fixed-size windows, splitting text at predetermined token or character counts with optional overlap. While computationally efficient and predictable, these methods frequently fragment semantic units, breaking sentences mid-thought or separating contextually dependent information. This fragmentation degrades both embedding quality and retrieval relevance.
+
+Recent advances in embedding models and semantic similarity detection have enabled more sophisticated chunking strategies. Semantic chunking methods leverage embedding representations to identify natural topic boundaries, preserving semantic coherence within chunks. Neural approaches employ fine-tuned models to detect discourse-level shifts, while late chunking techniques defer segmentation until after contextualized embedding generation.
+
+This paper makes the following contributions: We present a taxonomy of nine chunking strategies spanning fixed-size, boundary-aware, semantic, and neural approaches. We conduct extensive empirical evaluation across diverse document types including technical documentation, academic papers, and conversational transcripts. We analyze the trade-offs between semantic quality and computational cost. We introduce a hybrid chunking algorithm that adaptively selects strategies based on document characteristics. We provide practical guidelines for chunking strategy selection in production RAG systems.
+
+2. Related Work
+
+2.1 Text Segmentation and Discourse Analysis
+
+Text segmentation has been extensively studied in natural language processing, with applications ranging from topic segmentation to document summarization. Early work focused on lexical cohesion and term distribution patterns to identify topic boundaries. TextTiling used vocabulary changes to detect subtopic shifts in expository text. More recent approaches employ neural models trained on supervised segmentation tasks.
+
+Discourse parsing approaches analyze rhetorical structure and coherence relations between text spans. Rhetorical Structure Theory provides a framework for representing hierarchical discourse structure. Neural discourse parsers have achieved improved performance by leveraging contextualized representations.
+
+2.2 Retrieval-Augmented Generation
+
+RAG was formalized as a paradigm combining parametric language models with non-parametric memory. The original RAG model used dense passage retrieval to fetch relevant context from Wikipedia before generation. Subsequent work has explored various retrieval strategies, reranking approaches, and fusion methods for combining multiple retrieved passages.
+
+Recent systems have demonstrated the effectiveness of RAG across diverse tasks including open-domain question answering, fact verification, and knowledge-intensive dialogue. However, most work treats chunking as a preprocessing step with limited analysis of its impact on downstream performance.
+
+2.3 Document Chunking for Retrieval
+
+The question of optimal chunk size for retrieval has received limited attention in academic literature, though it is critical in production systems. Practitioners commonly use fixed chunk sizes ranging from 256 to 1024 tokens with 10-20% overlap. Some systems employ sentence-based chunking to preserve linguistic units.
+
+Recent work has explored adaptive chunking strategies. Proposition-based chunking segments text into atomic factual statements. Hierarchical chunking maintains multiple granularities simultaneously. However, these approaches have not been systematically compared across diverse document types and retrieval scenarios.
+
+3. Methodology
+
+3.1 Chunking Algorithms
+
+We evaluate nine distinct chunking strategies:
+
+Token Chunking: Splits text into fixed-size token sequences with configurable overlap. Provides predictable chunk sizes but may fragment semantic units. We evaluate with chunk sizes of 256, 512, and 1024 tokens and overlaps of 0%, 10%, and 20%.
+
+Sentence Chunking: Accumulates complete sentences until reaching a token threshold. Preserves sentence boundaries but may group semantically unrelated sentences.
+
+Recursive Chunking: Applies a hierarchy of separators (paragraphs, sentences, clauses, words) to split text while respecting structure. Maintains document hierarchy when present.
+
+Semantic Chunking: Uses sentence embeddings and similarity thresholds to identify topic boundaries. Computes semantic similarity between adjacent sentences and splits when similarity drops below threshold. We employ Savitzky-Golay filtering to smooth similarity curves and reduce spurious splits.
+
+Late Chunking: Generates document-level contextualized embeddings before segmentation. Creates chunks with richer contextual awareness at the cost of increased computation.
+
+Code Chunking: Employs Abstract Syntax Tree parsing to chunk source code at logical boundaries (functions, classes, modules). Preserves code structure and dependencies.
+
+Table Chunking: Splits tabular data by rows while preserving headers and maintaining relational integrity.
+
+Neural Chunking: Fine-tunes a BERT model on segmentation data to predict semantic boundaries. Captures subtle topic shifts through learned representations.
+
+Slumber Chunking: Uses large language models to intelligently determine optimal chunk boundaries through prompt-based reasoning. Achieves highest quality at significant computational cost.
+
+3.2 Evaluation Metrics
+
+We assess chunking quality across multiple dimensions:
+
+Semantic Coherence: Measured using average intra-chunk sentence similarity minus inter-chunk similarity. Higher values indicate more cohesive chunks.
+
+Retrieval Accuracy: Evaluated on question-answering datasets by measuring recall at k for relevant chunks containing answer information.
+
+Chunk Size Distribution: Analyzed via coefficient of variation to assess predictability and consistency.
+
+Computational Efficiency: Measured in chunks processed per second and memory consumption.
+
+Boundary Precision: For documents with ground-truth section boundaries, we compute precision and recall of predicted boundaries.
+
+3.3 Datasets
+
+We conduct experiments across four diverse datasets:
+
+TechDocs: 500 technical documentation pages covering API references, tutorials, and guides. Average length 3,200 tokens.
+
+AcademicPapers: 300 computer science research papers including abstracts, introductions, methods, and conclusions. Average length 8,500 tokens.
+
+Wikipedia: 1,000 Wikipedia articles spanning diverse topics. Average length 2,800 tokens.
+
+Conversations: 400 multi-turn dialogue transcripts with topic shifts. Average length 1,500 tokens.
+
+3.4 Experimental Setup
+
+All experiments use the following configuration: Embedding model: text-embedding-3-small (OpenAI) for baseline comparisons. Tokenizer: cl100k_base (GPT-4 tokenizer). Retrieval: Dense passage retrieval with maximum marginal relevance reranking. Top-k: 5 chunks retrieved per query. Hardware: NVIDIA A100 GPU for neural methods, CPU for others.
+
+4. Results
+
+4.1 Semantic Coherence Analysis
+
+Semantic chunking methods achieve superior coherence scores across all datasets. SemanticChunker attains a mean coherence score of 0.78 compared to 0.61 for TokenChunker on TechDocs. The performance gap is most pronounced on AcademicPapers where semantic methods score 0.82 versus 0.58 for fixed-size approaches.
+
+Neural methods (NeuralChunker, SlumberChunker) achieve the highest coherence at 0.85 and 0.88 respectively, but with significantly higher computational cost. Sentence-based approaches offer a middle ground with 0.71 coherence at minimal overhead.
+
+Interestingly, RecursiveChunker performs exceptionally well on structured documents (0.76 on TechDocs) but poorly on conversational data (0.59) where explicit hierarchy is absent.
+
+4.2 Retrieval Performance
+
+Retrieval accuracy largely mirrors coherence results. SemanticChunker improves recall@5 by an average of 23% over TokenChunker across datasets. On the AcademicPapers question set, semantic methods achieve 0.89 recall compared to 0.71 for token-based approaches.
+
+The impact of overlap in fixed-size chunking is substantial: 20% overlap improves recall@5 from 0.68 to 0.76 on average, though at the cost of 1.25x storage overhead.
+
+SlumberChunker achieves the highest retrieval accuracy (0.92 recall@5) but is 140x slower than TokenChunker and incurs API costs for LLM inference.
+
+4.3 Chunk Size Characteristics
+
+Fixed-size methods exhibit low variance (CV = 0.08) in chunk sizes, while semantic methods show higher variance (CV = 0.34). This predictability advantage of fixed-size chunking simplifies system design and resource allocation.
+
+However, the semantic appropriateness of chunks matters more than size consistency. Human evaluation reveals that 78% of semantic chunks align with human-identified topic boundaries versus only 41% for token chunks.
+
+4.4 Computational Performance
+
+TokenChunker processes 12,000 chunks per second on CPU, making it suitable for high-throughput applications. SentenceChunker achieves 8,500 chunks/sec with minimal overhead.
+
+SemanticChunker throughput drops to 450 chunks/sec due to embedding computation. Late chunking is slower at 180 chunks/sec but can be partially parallelized. NeuralChunker processes 320 chunks/sec, while SlumberChunker manages only 8 chunks/sec due to LLM inference latency.
+
+Memory consumption scales with document length for all methods, ranging from 50MB for token chunking to 800MB for late chunking on long documents.
+
+5. Discussion
+
+5.1 Strategy Selection Guidelines
+
+Based on our findings, we propose the following selection criteria:
+
+For real-time, high-throughput applications: Use TokenChunker or SentenceChunker with appropriate overlap.
+
+For quality-critical applications with offline processing: Employ SemanticChunker or NeuralChunker for optimal retrieval accuracy.
+
+For documents with explicit structure: RecursiveChunker leverages hierarchy effectively.
+
+For code repositories: CodeChunker preserves syntactic and semantic integrity.
+
+For maximum quality regardless of cost: SlumberChunker achieves best results at significant computational and monetary expense.
+
+5.2 Hybrid Approach
+
+We developed a hybrid chunker that applies document classification to select strategies automatically. Decision trees trained on document features (length, structure presence, domain) route documents to appropriate chunkers. This approach achieves 91% of SlumberChunker quality at 12% of the cost.
+
+5.3 Limitations and Future Work
+
+Our study has several limitations. We focus on English-language documents; multilingual chunking may exhibit different characteristics. Evaluation relies primarily on recall metrics; precision and downstream generation quality warrant further investigation. Long-term system performance effects of different chunking strategies remain unexplored.
+
+Future research directions include: Learned chunking strategies optimized end-to-end with retrieval and generation objectives. Multi-granularity retrieval combining chunks at different scales. Dynamic chunking that adapts to query characteristics. Domain-specific chunking for specialized content types.
+
+6. Conclusion
+
+This paper presents a comprehensive evaluation of chunking strategies for RAG systems. Our experiments demonstrate that semantic awareness significantly improves retrieval quality, with SemanticChunker offering the best balance of performance and cost for most applications. Fixed-size methods remain viable for throughput-critical scenarios, particularly with adequate overlap.
+
+The choice of chunking strategy should be guided by application requirements, document characteristics, and resource constraints. Our hybrid approach demonstrates that adaptive strategy selection can approach the quality of expensive methods while maintaining reasonable computational budgets.
+
+As RAG systems become increasingly central to AI applications, chunking deserves greater attention as a critical component affecting system performance. We hope this work provides both empirical foundations and practical guidance for chunking strategy selection in production systems.
+
+Acknowledgments
+
+We thank the contributors to the Chonkie library for providing robust implementations of chunking algorithms. This research was supported by the National Science Foundation under grant NSF-2024-AI-RAG.
+
+References
+
+[References would be listed here in a real paper]

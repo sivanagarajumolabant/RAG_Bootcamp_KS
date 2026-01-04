@@ -1,0 +1,311 @@
+# Chonkie API Documentation
+
+## Overview
+
+Chonkie is a lightweight, high-performance library for chunking text in Retrieval-Augmented Generation (RAG) applications. It provides a comprehensive suite of chunking algorithms designed for different document types and use cases.
+
+## Installation
+
+### Basic Installation
+
+To install Chonkie with default chunkers:
+
+```bash
+pip install chonkie
+```
+
+### Installation Tiers
+
+Chonkie offers three installation tiers to match your needs:
+
+**Default Tier:**
+Includes TokenChunker, SentenceChunker, RecursiveChunker, and TableChunker. Perfect for most use cases.
+
+```bash
+pip install chonkie
+```
+
+**Semantic Tier:**
+Adds embedding-based chunkers (SemanticChunker, LateChunker, NeuralChunker):
+
+```bash
+pip install chonkie[semantic]
+```
+
+**All Features:**
+Install everything, including code chunking and LLM-powered chunking:
+
+```bash
+pip install chonkie[all]
+```
+
+## Quick Start
+
+### Basic Usage
+
+All Chonkie chunkers follow a consistent API:
+
+```python
+from chonkie import TokenChunker
+
+# Initialize chunker
+chunker = TokenChunker(chunk_size=512, chunk_overlap=128)
+
+# Chunk a single text
+chunks = chunker.chunk("Your text here...")
+
+# Or use the callable interface
+chunks = chunker("Your text here...")
+
+# Batch processing
+texts = ["Text 1", "Text 2", "Text 3"]
+batch_chunks = chunker.chunk_batch(texts)
+```
+
+### TokenChunker API
+
+The TokenChunker splits text into fixed-size token chunks with configurable overlap.
+
+**Parameters:**
+- `tokenizer` (Tokenizer): Tokenizer instance (default: AutoTikTokenizer)
+- `chunk_size` (int): Maximum tokens per chunk (default: 512)
+- `chunk_overlap` (int): Number of overlapping tokens between chunks (default: 128)
+
+**Methods:**
+- `chunk(text: str) -> List[Chunk]`: Chunk a single text
+- `chunk_batch(texts: List[str]) -> List[List[Chunk]]`: Chunk multiple texts
+- `__call__(text: str) -> List[Chunk]`: Direct calling interface
+
+**Example:**
+
+```python
+from chonkie import TokenChunker
+from tokenizers import Tokenizer
+
+tokenizer = Tokenizer.from_pretrained("gpt2")
+chunker = TokenChunker(
+    tokenizer=tokenizer,
+    chunk_size=512,
+    chunk_overlap=128
+)
+
+text = "Your long document here..."
+chunks = chunker.chunk(text)
+
+for i, chunk in enumerate(chunks):
+    print(f"Chunk {i}: {len(chunk.text)} characters")
+    print(f"Token count: {chunk.token_count}")
+```
+
+### SentenceChunker API
+
+The SentenceChunker preserves sentence boundaries while respecting token limits.
+
+**Parameters:**
+- `tokenizer` (Tokenizer): Tokenizer instance
+- `chunk_size` (int): Maximum tokens per chunk (default: 512)
+- `min_sentences_per_chunk` (int): Minimum sentences per chunk (default: 1)
+
+**Use Cases:**
+- Question-answering systems
+- Semantic search where complete thoughts matter
+- Documents where sentence integrity is critical
+
+**Example:**
+
+```python
+from chonkie import SentenceChunker
+
+chunker = SentenceChunker(
+    tokenizer=tokenizer,
+    chunk_size=512,
+    min_sentences_per_chunk=2
+)
+
+chunks = chunker.chunk(text)
+```
+
+### RecursiveChunker API
+
+The RecursiveChunker uses hierarchical splitting with multiple delimiters.
+
+**Parameters:**
+- `tokenizer` (Tokenizer): Tokenizer instance
+- `chunk_size` (int): Maximum tokens per chunk (default: 512)
+- `chunk_overlap` (int): Overlapping tokens (default: 128)
+- `separators` (List[str]): Delimiters in priority order (default: ["\n\n", "\n", ". ", " "])
+
+**Use Cases:**
+- Markdown documents
+- Structured text with clear hierarchy
+- Documents with multiple sections
+
+**Example:**
+
+```python
+from chonkie import RecursiveChunker
+
+chunker = RecursiveChunker(
+    tokenizer=tokenizer,
+    chunk_size=512,
+    chunk_overlap=128,
+    separators=["\n\n", "\n", ". ", " ", ""]
+)
+
+chunks = chunker.chunk(markdown_text)
+```
+
+### SemanticChunker API
+
+The SemanticChunker uses embeddings to identify natural topic boundaries.
+
+**Parameters:**
+- `embedding_model` (EmbeddingModel): Embedding model instance
+- `threshold` (float or "auto"): Similarity threshold for splitting (default: "auto")
+- `chunk_size` (int): Maximum tokens per chunk (default: 512)
+- `min_sentences` (int): Minimum sentences to start a chunk (default: 1)
+
+**Features:**
+- Automatic threshold detection
+- Savitzky-Golay filtering for smooth boundaries
+- Skip-window merging for coherence
+
+**Use Cases:**
+- Multi-topic documents
+- Content with natural semantic shifts
+- When topical coherence is paramount
+
+**Example:**
+
+```python
+from chonkie import SemanticChunker, GeminiEmbeddings
+
+embeddings = GeminiEmbeddings(api_key="your_key")
+chunker = SemanticChunker(
+    embedding_model=embeddings,
+    threshold="auto",
+    chunk_size=512
+)
+
+chunks = chunker.chunk(text)
+```
+
+## Advanced Features
+
+### Embeddings Integration
+
+Chonkie supports multiple embedding providers:
+
+**Google Gemini:**
+```python
+from chonkie import GeminiEmbeddings
+
+embeddings = GeminiEmbeddings(
+    model="gemini-embedding-exp-03-07",
+    api_key="your_api_key",
+    task_type="SEMANTIC_SIMILARITY"
+)
+```
+
+**OpenAI:**
+```python
+from chonkie import OpenAIEmbeddings
+
+embeddings = OpenAIEmbeddings(
+    model="text-embedding-3-small",
+    api_key="your_api_key"
+)
+```
+
+**Sentence Transformers:**
+```python
+from chonkie import SentenceTransformerEmbeddings
+
+embeddings = SentenceTransformerEmbeddings(
+    model="all-MiniLM-L6-v2"
+)
+```
+
+### Batch Processing
+
+For processing large collections of documents:
+
+```python
+documents = load_documents()  # List of texts
+chunks = chunker.chunk_batch(documents)
+
+# Process in parallel
+from concurrent.futures import ThreadPoolExecutor
+
+with ThreadPoolExecutor(max_workers=4) as executor:
+    results = list(executor.map(chunker.chunk, documents))
+```
+
+### Error Handling
+
+```python
+try:
+    chunks = chunker.chunk(text)
+except ChunkingError as e:
+    print(f"Chunking failed: {e}")
+    # Fallback to simpler chunker
+    backup_chunker = TokenChunker()
+    chunks = backup_chunker.chunk(text)
+```
+
+## Performance Optimization
+
+### Caching
+
+Chonkie automatically caches computations to prevent redundant work:
+
+```python
+# First call computes embeddings
+chunks1 = semantic_chunker.chunk(text)
+
+# Second call with same text uses cache
+chunks2 = semantic_chunker.chunk(text)  # Much faster!
+```
+
+### Memory Management
+
+For large documents, use streaming:
+
+```python
+def chunk_large_file(filepath, chunker):
+    with open(filepath, 'r') as f:
+        for line in f:
+            yield from chunker.chunk(line)
+
+for chunk in chunk_large_file("large_file.txt", chunker):
+    process(chunk)
+```
+
+## Best Practices
+
+1. **Choose the right chunker** for your use case
+2. **Start with defaults** and tune parameters based on results
+3. **Use overlaps** to prevent context loss at boundaries
+4. **Test with your data** - different content types may need different approaches
+5. **Monitor token counts** to stay within model limits
+6. **Use semantic chunkers** for topically diverse content
+7. **Cache embeddings** when possible for better performance
+
+## Thread Safety
+
+All Chonkie chunkers are thread-safe, making them suitable for concurrent processing environments.
+
+```python
+from concurrent.futures import ThreadPoolExecutor
+
+with ThreadPoolExecutor(max_workers=8) as executor:
+    results = executor.map(chunker.chunk, documents)
+```
+
+## Version Information
+
+This documentation is for Chonkie version 1.5.0. For the latest updates, visit https://docs.chonkie.ai
+
+## Support
+
+For issues, questions, or feature requests, visit our GitHub repository at https://github.com/chonkie-inc/chonkie

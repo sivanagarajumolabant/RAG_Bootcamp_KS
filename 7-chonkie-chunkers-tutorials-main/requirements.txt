@@ -1,0 +1,15 @@
+chonkie==1.5.0
+jupyter
+notebook
+python-dotenv
+matplotlib
+seaborn
+pandas
+tokenizers
+google-generativeai
+numpy
+
+# Advanced tutorial dependencies
+chromadb
+pinecone-client
+datasets
