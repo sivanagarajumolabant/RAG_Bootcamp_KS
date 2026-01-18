@@ -1,0 +1,23 @@
+# Core LlamaIndex packages
+llama-index-core
+llama-index-llms-openai
+llama-index-embeddings-openai
+
+# Database drivers and adapters
+sqlalchemy
+duckdb
+duckdb-engine
+psycopg2-binary  # PostgreSQL driver
+
+# Data processing
+pandas
+numpy
+
+# Visualization and utilities
+jupyter
+ipython
+python-dotenv
+
+# Optional but recommended
+openai  # Direct OpenAI API access
+pydantic  # For structured outputs
