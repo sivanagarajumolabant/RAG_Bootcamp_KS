@@ -17,7 +17,8 @@ logger = logging.getLogger("rag_app.document_service")
 def parse_document(file_path: str) -> str:
     """
     Parse any document type and return extracted text.
-    Uses Unstructured.io to handle PDF, DOCX, CSV, JSON, and other formats.
+    Uses fast direct read for simple text files (.txt, .md, .csv).
+    Uses Unstructured.io for complex formats (PDF, DOCX, JSON, etc.).
 
     Args:
         file_path: Path to the document file
@@ -33,9 +34,33 @@ def parse_document(file_path: str) -> str:
     if not Path(file_path).exists():
         raise FileNotFoundError(f"File not found: {file_path}")
 
+    # Fast path for simple text files - bypass unstructured library
+    # This is critical for Lambda performance (avoids 30+ second timeout)
+    file_extension = Path(file_path).suffix.lower()
+    if file_extension in ['.txt', '.md', '.csv', '.log', '.json']:
+        try:
+            logger.info(f"Using fast text read for {file_extension} file")
+            with open(file_path, 'r', encoding='utf-8') as f:
+                return f.read()
+        except UnicodeDecodeError:
+            # Try with different encoding
+            try:
+                with open(file_path, 'r', encoding='latin-1') as f:
+                    return f.read()
+            except Exception as e:
+                logger.warning(f"Fast text read failed: {e}, falling back to unstructured")
+        except Exception as e:
+            logger.warning(f"Fast text read failed: {e}, falling back to unstructured")
+
     try:
-        # Use Unstructured.io's auto partition to handle any file type
-        elements = partition(filename=file_path)
+        # Use Unstructured.io's auto partition for complex formats (PDF, DOCX, etc.)
+        # strategy="fast" disables OCR (tesseract) for Lambda compatibility
+        # OCR can be enabled by adding tesseract Lambda layer and using strategy="hi_res"
+        logger.info(f"Using unstructured library for {file_extension} file")
+        elements = partition(
+            filename=file_path,
+            strategy="fast"  # Fast mode: no OCR, works without tesseract
+        )
 
         # Combine all elements into a single text string
         text = "\n\n".join([str(el) for el in elements])
@@ -173,8 +198,26 @@ def parse_and_chunk_with_context(file_path: str, chunk_size: int = 512, min_chun
     Returns:
         List of chunk dictionaries with rich metadata
     """
+    # Fast path for simple text files - bypass Docling to avoid Lambda timeout
+    # This is critical for Lambda performance (Docling causes 30+ second timeout)
+    file_extension = Path(file_path).suffix.lower()
+    if file_extension in ['.txt', '.md', '.csv', '.log', '.json']:
+        logger.info(f"Using fast token-based chunking for {file_extension} file (bypassing Docling)")
+        text = parse_document(file_path)  # Uses fast path internally
+        chunks = chunk_text(text, chunk_size=chunk_size, overlap=50)
+
+        # Add empty metadata fields for compatibility
+        for chunk in chunks:
+            chunk['headings'] = []
+            chunk['page_numbers'] = []
+            chunk['doc_items'] = []
+            chunk['captions'] = []
+
+        logger.info(f"Fast chunking complete: {len(chunks)} chunks")
+        return chunks
+
     try:
-        # Try Docling first (context-aware chunking with merging)
+        # Try Docling for complex formats (PDF, DOCX, etc.)
         from app.services.docling_service import parse_and_chunk_document
 
         logger.info(f"Using Docling for context-aware chunking: {Path(file_path).name}")

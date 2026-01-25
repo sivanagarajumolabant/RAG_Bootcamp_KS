@@ -3,31 +3,36 @@ RAG (Retrieval-Augmented Generation) Service
 Combines vector search with LLM generation to answer questions from documents.
 """
 
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from openai import AsyncOpenAI
+import logging
 from app.config import settings
 from app.services.vector_service import VectorService
 from app.services.embedding_service import EmbeddingService
+
+logger = logging.getLogger(__name__)
 
 
 class RAGService:
     """Service for Retrieval-Augmented Generation."""
 
-    def __init__(self, api_key: str | None = None):
+    def __init__(self, api_key: str | None = None, query_cache_service=None):
         """
         Initialize the RAG service.
 
         Args:
             api_key: OpenAI API key (optional, uses settings if not provided)
+            query_cache_service: Optional QueryCacheService for response caching
         """
         self.api_key = api_key or settings.OPENAI_API_KEY
         if not self.api_key:
             raise ValueError("OpenAI API key is required. Set OPENAI_API_KEY in .env file.")
 
         # Initialize services
-        self.embedding_service = EmbeddingService(api_key=self.api_key)
+        self.embedding_service = EmbeddingService(api_key=self.api_key, query_cache_service=query_cache_service)
         self.vector_service = VectorService()
         self.llm_client = AsyncOpenAI(api_key=self.api_key)
+        self.query_cache_service = query_cache_service  # Optional cache service
 
         # LLM configuration
         self.model = "gpt-4-turbo-preview"
@@ -44,6 +49,11 @@ class RAGService:
         """
         Full RAG pipeline: retrieve relevant chunks and generate an answer.
 
+        NEW: Implements query-level caching to save ~$0.05 per cache hit.
+        - Cache key: hash(question + top_k)
+        - Cache TTL: 1 hour (configurable)
+        - Falls back to uncached if Redis unavailable
+
         Args:
             question: User's question
             top_k: Number of chunks to retrieve (default: 3)
@@ -57,8 +67,22 @@ class RAGService:
                 - sources: List of source chunks used (if include_sources=True)
                 - chunks_used: Number of chunks retrieved
                 - model: LLM model used
+                - cache_hit: Whether result came from cache (NEW)
+                - cost_saved: Estimated cost saved if cache hit (NEW)
         """
         try:
+            # Check cache first (if cache service is available)
+            if self.query_cache_service and self.query_cache_service.enabled:
+                cache_key = self.query_cache_service.get_rag_key(question, top_k)
+                cached_result = self.query_cache_service.get(cache_key, cache_type="rag")
+
+                if cached_result:
+                    logger.info(f"RAG cache HIT for question: '{question[:50]}...'")
+                    return {
+                        **cached_result,
+                        "cache_hit": True,
+                        "cost_saved": "$0.05"  # Approximate GPT-4 cost per query
+                    }
             # Step 1: Generate query embedding with usage tracking
             embeddings, embedding_usage = await self.embedding_service.generate_embeddings([question])
             query_embedding = embeddings[0]
@@ -117,13 +141,14 @@ class RAGService:
             } if hasattr(response, 'usage') and response.usage else None
 
             # Combine embedding + LLM usage
+            # Use .get() to handle cases where keys might be missing (e.g., 100% cache hit)
             combined_usage = {
-                "embedding_tokens": embedding_usage['total_tokens'] if embedding_usage else 0,
-                "llm_prompt_tokens": llm_usage['prompt_tokens'] if llm_usage else 0,
-                "llm_completion_tokens": llm_usage['completion_tokens'] if llm_usage else 0,
+                "embedding_tokens": embedding_usage.get('total_tokens', 0) if embedding_usage else 0,
+                "llm_prompt_tokens": llm_usage.get('prompt_tokens', 0) if llm_usage else 0,
+                "llm_completion_tokens": llm_usage.get('completion_tokens', 0) if llm_usage else 0,
                 "total_tokens": (
-                    (embedding_usage['total_tokens'] if embedding_usage else 0) +
-                    (llm_usage['total_tokens'] if llm_usage else 0)
+                    (embedding_usage.get('total_tokens', 0) if embedding_usage else 0) +
+                    (llm_usage.get('total_tokens', 0) if llm_usage else 0)
                 )
             }
 
@@ -133,13 +158,24 @@ class RAGService:
                 "answer": answer,
                 "chunks_used": len(chunks),
                 "model": self.model,
-                "usage": combined_usage  # NEW: Include usage data for OPIK cost tracking
+                "usage": combined_usage  # Include usage data for OPIK cost tracking
             }
 
             if include_sources:
                 result["sources"] = self._format_sources(chunks)
 
-            return result
+            # Cache the result (if cache service is available)
+            if self.query_cache_service and self.query_cache_service.enabled:
+                cache_key = self.query_cache_service.get_rag_key(question, top_k)
+                ttl = settings.CACHE_TTL_RAG  # Default: 1 hour
+                self.query_cache_service.set(cache_key, result, ttl=ttl, cache_type="rag")
+                logger.info(f"RAG cache MISS - cached result for '{question[:50]}...' (TTL: {ttl}s)")
+
+            return {
+                **result,
+                "cache_hit": False,
+                "cost_saved": "$0.00"
+            }
 
         except Exception as e:
             raise Exception(f"RAG pipeline failed: {str(e)}")
