@@ -1,0 +1,19 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+.claude
+.deepeval
+.env
+uv.lock
+main.py
+GraphRAG_Complete_Guide.md
+docs/*
+database_evolution_guide.md
+extras/*
